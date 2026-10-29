@@ -30,6 +30,7 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Currency
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -78,6 +79,7 @@ fun StoreScreen(vm: StoreViewModel = viewModel()) {
     val context = LocalContext.current
     var tab by remember { mutableIntStateOf(0) }
     var search by remember { mutableStateOf("") }
+    var scannedQuery by remember { mutableStateOf<String?>(null) }
     var location by remember { mutableStateOf<Int?>(null) }
     var method by remember { mutableStateOf<Int?>(null) }
     var confirmation by remember { mutableStateOf(false) }
@@ -93,6 +95,7 @@ fun StoreScreen(vm: StoreViewModel = viewModel()) {
     val total = s.cart.sumOf { it.variant.price * it.quantity }
     LaunchedEffect(s.url) {
         search = ""
+        scannedQuery = null
         location = null
         method = null
         confirmation = false
@@ -105,6 +108,13 @@ fun StoreScreen(vm: StoreViewModel = viewModel()) {
         namedEditor = null
         returnEditor = null
     }
+    LaunchedEffect(scannedQuery) {
+        val query = scannedQuery ?: return@LaunchedEffect
+        // Resuming from the Google scanner may first refresh the connection.
+        while (vm.state.busy) delay(100)
+        vm.search(query)
+        scannedQuery = null
+    }
     fun scan() {
         GmsBarcodeScanning.getClient(context)
             .startScan()
@@ -116,7 +126,7 @@ fun StoreScreen(vm: StoreViewModel = viewModel()) {
                     Toast.makeText(context, "Posizione: ${place.name}", Toast.LENGTH_LONG).show()
                 } else {
                     search = value
-                    vm.search(value)
+                    scannedQuery = value
                 }
             }
             .addOnFailureListener {
