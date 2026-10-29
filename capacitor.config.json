@@ -1,0 +1,6 @@
+{
+  "appId": "com.italianstore.app",
+  "appName": "Italian Store App",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
