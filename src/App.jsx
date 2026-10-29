@@ -1,4 +1,10 @@
 import { useMemo, useState } from 'react';
+import Header from './components/Header';
+import InventoryTable from './components/InventoryTable';
+import MetricCard from './components/MetricCard';
+import MovementForm from './components/MovementForm';
+import MovementList from './components/MovementList';
+import ProductForm from './components/ProductForm';
 import { initialMovements, initialProducts } from './data';
 
 const defaultProductForm = {
@@ -15,8 +21,6 @@ const formatCurrency = (value) =>
     style: 'currency',
     currency: 'EUR',
   }).format(value || 0);
-
-const getStatus = (stock, minStock) => (stock <= minStock ? 'low' : 'ok');
 
 function App() {
   const [products, setProducts] = useState(initialProducts);
@@ -115,36 +119,18 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <h1>Italian Store App</h1>
-          <div className="small-text">Control de almacén y punto de venta</div>
-        </div>
-        <div className="status-pill">MVP activo</div>
-      </header>
+      <Header />
 
       <section className="grid">
-        <article className="card metric">
-          <span className="label">Valor del inventario</span>
-          <span className="value">{formatCurrency(metrics.inventoryValue)}</span>
-        </article>
-        <article className="card metric">
-          <span className="label">Productos</span>
-          <span className="value">{products.length}</span>
-        </article>
-        <article className="card metric">
-          <span className="label">Unidades totales</span>
-          <span className="value">{metrics.totalUnits}</span>
-        </article>
-        <article className="card metric">
-          <span className="label">Stock bajo</span>
-          <span className="value">{metrics.lowStockItems}</span>
-        </article>
+        <MetricCard label="Valor del inventario" value={formatCurrency(metrics.inventoryValue)} />
+        <MetricCard label="Productos" value={String(products.length)} />
+        <MetricCard label="Unidades totales" value={String(metrics.totalUnits)} />
+        <MetricCard label="Stock bajo" value={String(metrics.lowStockItems)} />
       </section>
 
       <div className="layout">
         <section className="card">
-          <div className="tabs">
+          <div className="tabs" aria-label="Selector de vistas">
             <button
               className={`tab ${activeTab === 'inventory' ? 'active' : ''}`}
               onClick={() => setActiveTab('inventory')}
@@ -161,127 +147,18 @@ function App() {
             </button>
           </div>
 
-          {activeTab === 'inventory' ? (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th>SKU</th>
-                    <th>Stock</th>
-                    <th>Precio</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id}>
-                      <td>
-                        <strong>{product.name}</strong>
-                        <div className="small-text">{product.category}</div>
-                      </td>
-                      <td>{product.sku}</td>
-                      <td>{product.stock}</td>
-                      <td>{formatCurrency(product.price)}</td>
-                      <td>
-                        <span className={`badge ${getStatus(product.stock, product.minStock)}`}>
-                          {product.stock <= product.minStock ? 'Bajo' : 'OK'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="movement-list">
-              {movements.map((movement) => {
-                const product = products.find((item) => item.id === movement.productId);
-                return (
-                  <div key={movement.id} className={`movement-item ${movement.type}`}>
-                    <strong>{movement.type.toUpperCase()}</strong>
-                    <div>{product?.name ?? 'Producto no encontrado'}</div>
-                    <div className="small-text">
-                      {Math.abs(movement.quantity)} unidades · {new Date(movement.timestamp).toLocaleString('es-ES')}
-                    </div>
-                    <div className="small-text">{movement.note}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {activeTab === 'inventory' ? <InventoryTable products={products} /> : <MovementList products={products} movements={movements} />}
         </section>
 
-        <aside className="card">
-          <h3>Alta de producto</h3>
-          <form className="form-grid" onSubmit={handleCreateProduct}>
-            <label>
-              SKU
-              <input name="sku" value={productForm.sku} onChange={handleProductChange} placeholder="P-010" />
-            </label>
-            <label>
-              Nombre
-              <input name="name" value={productForm.name} onChange={handleProductChange} placeholder="Queso Parmesano" />
-            </label>
-            <div className="two-col">
-              <label>
-                Categoría
-                <input name="category" value={productForm.category} onChange={handleProductChange} />
-              </label>
-              <label>
-                Stock mínimo
-                <input type="number" name="minStock" value={productForm.minStock} onChange={handleProductChange} />
-              </label>
-            </div>
-            <div className="two-col">
-              <label>
-                Cantidad
-                <input type="number" name="stock" value={productForm.stock} onChange={handleProductChange} />
-              </label>
-              <label>
-                Precio
-                <input type="number" step="0.01" name="price" value={productForm.price} onChange={handleProductChange} />
-              </label>
-            </div>
-            <div className="button-row">
-              <button className="primary" type="submit">Guardar producto</button>
-            </div>
-          </form>
-
-          <h3 style={{ marginTop: '22px' }}>Movimiento de stock</h3>
-          <form className="form-grid" onSubmit={handleAddMovement}>
-            <label>
-              Producto
-              <select name="productId" value={movementForm.productId} onChange={handleMovementChange}>
-                {products.map((product) => (
-                  <option key={product.id} value={String(product.id)}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="two-col">
-              <label>
-                Tipo
-                <select name="type" value={movementForm.type} onChange={handleMovementChange}>
-                  <option value="entrada">Entrada</option>
-                  <option value="salida">Salida</option>
-                  <option value="ajuste">Ajuste</option>
-                </select>
-              </label>
-              <label>
-                Cantidad
-                <input type="number" name="quantity" min="1" value={movementForm.quantity} onChange={handleMovementChange} />
-              </label>
-            </div>
-            <label>
-              Nota
-              <input name="note" value={movementForm.note} onChange={handleMovementChange} placeholder="Pedido, venta, revisión..." />
-            </label>
-            <div className="button-row">
-              <button className="primary" type="submit">Registrar movimiento</button>
-            </div>
-          </form>
+        <aside className="card sidebar-panel">
+          <ProductForm form={productForm} onChange={handleProductChange} onSubmit={handleCreateProduct} />
+          <div className="divider" />
+          <MovementForm
+            products={products}
+            form={movementForm}
+            onChange={handleMovementChange}
+            onSubmit={handleAddMovement}
+          />
         </aside>
       </div>
     </div>

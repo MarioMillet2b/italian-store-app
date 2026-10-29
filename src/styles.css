@@ -29,6 +29,12 @@ button, input, select {
   font: inherit;
 }
 
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .app-shell {
   max-width: 1200px;
   margin: 0 auto;
@@ -41,6 +47,14 @@ button, input, select {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #7dd3fc;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 .topbar h1 {
@@ -97,6 +111,17 @@ button, input, select {
   margin-top: 20px;
 }
 
+.sidebar-panel {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.divider {
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  margin-top: 6px;
+}
+
 .table-wrapper {
   overflow-x: auto;
 }
@@ -136,6 +161,15 @@ th {
 .badge.ok {
   background: rgba(52, 211, 153, 0.1);
   color: #86efac;
+}
+
+.empty-state {
+  margin-top: 10px;
+  padding: 18px 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  color: #cbd5e1;
+  text-align: center;
 }
 
 .form-grid {
@@ -201,6 +235,18 @@ button:hover {
   background: rgba(15, 23, 42, 0.65);
   border-radius: 10px;
   padding: 12px;
+}
+
+.movement-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.movement-quantity {
+  color: #7dd3fc;
+  font-weight: 700;
 }
 
 .movement-item.entrada {
