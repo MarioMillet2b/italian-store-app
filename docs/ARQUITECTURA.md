@@ -19,7 +19,9 @@ Java 17 o superior para compilar. Runtime de Android, sin servidor propio.
 No se guarda catálogo local ni se autoriza una venta con stock del teléfono.
 El servidor valida precio y existencias y respeta reservas web. App exige
 conexión, con banner permanente al detectar pérdida o rechazo de acceso.
-El heartbeat detecta la desconexión en aproximadamente 10s más timeout; una
+Android avisa inmediatamente si se pierde la red del dispositivo. El heartbeat
+solo consulta mientras la actividad está visible y comprueba el servidor en
+aproximadamente 10s más timeout; una
 acción puede fallar antes y bloquear de inmediato.
 
 ## Solicitud de resultado incierto

@@ -1,6 +1,8 @@
 package com.floromilano.app
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -63,6 +65,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private val vault = (application as StoreApplication).vault
     private var vaultFailed = false
     private var sessionVersion = 0
+    private var foreground = false
     private var saved =
         try {
             vault.read()
@@ -86,10 +89,29 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun api() = StoreApi(saved.getString("url"), saved.getString("token"))
 
+    private val connectivity = application.getSystemService(ConnectivityManager::class.java)
+    private val networkCallback =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onLost(network: Network) {
+                viewModelScope.launch { state = state.copy(online = false) }
+            }
+        }
+
+    fun setForeground(visible: Boolean) {
+        foreground = visible
+        if (visible) refresh()
+    }
+
+    override fun onCleared() {
+        connectivity.unregisterNetworkCallback(networkCallback)
+        super.onCleared()
+    }
+
     init {
+        connectivity.registerDefaultNetworkCallback(networkCallback)
         viewModelScope.launch {
             while (true) {
-                if (state.configured && !state.busy) {
+                if (foreground && state.configured && !state.busy) {
                     val version = sessionVersion
                     try {
                         loadContext()

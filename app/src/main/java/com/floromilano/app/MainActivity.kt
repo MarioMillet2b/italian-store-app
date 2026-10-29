@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.math.BigDecimal
@@ -33,6 +34,18 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
+    private val storeViewModel by lazy { ViewModelProvider(this)[StoreViewModel::class.java] }
+
+    override fun onStart() {
+        super.onStart()
+        storeViewModel.setForeground(true)
+    }
+
+    override fun onStop() {
+        storeViewModel.setForeground(false)
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -47,7 +60,7 @@ class MainActivity : ComponentActivity() {
                         secondaryContainer = Color(0xFFEFE4CF),
                     )
             ) {
-                StoreScreen()
+                StoreScreen(storeViewModel)
             }
         }
     }
