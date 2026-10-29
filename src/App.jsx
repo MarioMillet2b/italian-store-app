@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import Header from './components/Header';
-import InventoryTable from './components/InventoryTable';
 import MetricCard from './components/MetricCard';
-import MovementForm from './components/MovementForm';
+import PosPanel from './components/PosPanel';
+import ShelfManager from './components/ShelfManager';
+import InventoryTable from './components/InventoryTable';
 import MovementList from './components/MovementList';
-import ProductForm from './components/ProductForm';
-import { initialMovements, initialProducts } from './data';
+import { initialMovements, initialProducts, initialShelves } from './data';
 
 const defaultProductForm = {
   sku: '',
@@ -16,6 +16,19 @@ const defaultProductForm = {
   minStock: 0,
 };
 
+const defaultShelfForm = {
+  selectedShelfId: initialShelves[0]?.id ?? 0,
+  shelfName: '',
+  shelfZone: '',
+  productId: null,
+  productName: '',
+  productSku: '',
+  productStock: 0,
+  productPrice: 0,
+  productMinStock: 0,
+  assignProductId: '',
+};
+
 const formatCurrency = (value) =>
   new Intl.NumberFormat('es-ES', {
     style: 'currency',
@@ -24,12 +37,14 @@ const formatCurrency = (value) =>
 
 function App() {
   const [products, setProducts] = useState(initialProducts);
+  const [shelves, setShelves] = useState(initialShelves);
   const [movements, setMovements] = useState(initialMovements);
-  const [activeTab, setActiveTab] = useState('inventory');
+  const [activeTab, setActiveTab] = useState('pos');
   const [productForm, setProductForm] = useState(defaultProductForm);
-  const [movementForm, setMovementForm] = useState({
+  const [shelfForm, setShelfForm] = useState(defaultShelfForm);
+  const [posForm, setPosForm] = useState({
     productId: String(initialProducts[0]?.id ?? ''),
-    type: 'entrada',
+    type: 'salida',
     quantity: 1,
     note: '',
   });
@@ -40,6 +55,18 @@ function App() {
     const totalUnits = products.reduce((sum, product) => sum + product.stock, 0);
     return { inventoryValue, lowStockItems, totalUnits };
   }, [products]);
+
+  const addMovement = ({ productId, type, quantity, note }) => {
+    const newMovement = {
+      id: Date.now(),
+      type,
+      productId,
+      quantity: type === 'salida' ? -Math.abs(quantity) : Math.abs(quantity),
+      note: note || 'Movimiento manual',
+      timestamp: new Date().toISOString(),
+    };
+    setMovements((prev) => [newMovement, ...prev]);
+  };
 
   const handleProductChange = (event) => {
     const { name, value } = event.target;
@@ -52,9 +79,7 @@ function App() {
   const handleCreateProduct = (event) => {
     event.preventDefault();
 
-    if (!productForm.name || !productForm.sku) {
-      return;
-    }
+    if (!productForm.name || !productForm.sku) return;
 
     const nextProduct = {
       id: Date.now(),
@@ -64,58 +89,107 @@ function App() {
       stock: Number(productForm.stock),
       price: Number(productForm.price),
       minStock: Number(productForm.minStock),
+      shelfId: shelfForm.selectedShelfId || initialShelves[0]?.id,
     };
 
     setProducts((prev) => [nextProduct, ...prev]);
     setProductForm(defaultProductForm);
-    setMovementForm((prev) => ({ ...prev, productId: String(nextProduct.id) }));
+    setPosForm((prev) => ({ ...prev, productId: String(nextProduct.id) }));
   };
 
-  const handleMovementChange = (event) => {
-    const { name, value } = event.target;
-    setMovementForm((prev) => ({
-      ...prev,
-      [name]: name === 'quantity' ? Number(value) : value,
-    }));
-  };
-
-  const handleAddMovement = (event) => {
-    event.preventDefault();
-
-    const productId = Number(movementForm.productId);
-    const selectedProduct = products.find((product) => product.id === productId);
-    if (!selectedProduct) {
-      return;
-    }
-
-    const quantity = Number(movementForm.quantity);
-    if (!quantity) {
-      return;
-    }
-
-    const delta = movementForm.type === 'salida' ? -Math.abs(quantity) : Math.abs(quantity);
-    const nextStock = selectedProduct.stock + delta;
-
-    setProducts((prev) =>
-      prev.map((product) =>
-        product.id === productId
-          ? { ...product, stock: Math.max(0, nextStock) }
-          : product
-      )
-    );
-
-    const newMovement = {
+  const handleCreateShelf = () => {
+    const nextShelf = {
       id: Date.now(),
-      type: movementForm.type,
-      productId,
-      quantity: movementForm.type === 'salida' ? -Math.abs(quantity) : Math.abs(quantity),
-      note: movementForm.note || 'Movimiento manual',
-      timestamp: new Date().toISOString(),
+      name: shelfForm.shelfName || `Estante ${String.fromCharCode(65 + shelves.length)}${shelves.length + 1}`,
+      zone: shelfForm.shelfZone || 'Nueva zona',
     };
-
-    setMovements((prev) => [newMovement, ...prev]);
-    setMovementForm((prev) => ({ ...prev, quantity: 1, note: '' }));
+    setShelves((prev) => [...prev, nextShelf]);
+    setShelfForm((prev) => ({ ...prev, selectedShelfId: nextShelf.id, shelfName: '', shelfZone: '' }));
   };
+
+  const handleDeleteShelf = (shelfId) => {
+    setShelves((prev) => prev.filter((shelf) => shelf.id !== shelfId));
+    setProducts((prev) => prev.map((product) => (product.shelfId === shelfId ? { ...product, shelfId: null } : product)));
+    setShelfForm((prev) => ({ ...prev, selectedShelfId: initialShelves[0]?.id ?? 0 }));
+  };
+
+  const handleDeleteProduct = (productId) => {
+    setProducts((prev) => prev.filter((product) => product.id !== productId));
+    setPosForm((prev) => ({ ...prev, productId: String(prev.productId === String(productId) ? initialProducts[0]?.id ?? '' : prev.productId) }));
+  };
+
+  const handleAssignProduct = () => {
+    const productId = Number(shelfForm.assignProductId);
+    if (!productId || !shelfForm.selectedShelfId) return;
+    setProducts((prev) => prev.map((product) => (product.id === productId ? { ...product, shelfId: shelfForm.selectedShelfId } : product)));
+    setShelfForm((prev) => ({ ...prev, assignProductId: '' }));
+  };
+
+  const handlePosChange = (event) => {
+    const { name, value } = event.target;
+    setPosForm((prev) => ({ ...prev, [name]: name === 'quantity' ? Number(value) : value }));
+  };
+
+  const handlePosSubmit = (event) => {
+    event.preventDefault();
+    const productId = Number(posForm.productId);
+    const selectedProduct = products.find((product) => product.id === productId);
+    if (!selectedProduct || !posForm.quantity) return;
+
+    if (posForm.type === 'salida' && selectedProduct.stock < posForm.quantity) {
+      return;
+    }
+
+    const delta = posForm.type === 'salida' ? -Math.abs(posForm.quantity) : Math.abs(posForm.quantity);
+    setProducts((prev) => prev.map((product) => (product.id === productId ? { ...product, stock: Math.max(0, product.stock + delta) } : product)));
+    addMovement({ productId, type: posForm.type, quantity: posForm.quantity, note: posForm.note });
+    setPosForm((prev) => ({ ...prev, quantity: 1, note: '' }));
+  };
+
+  const inventoryTab = (
+    <section className="card">
+      <div className="tabs" aria-label="Selector de vistas">
+        <button className={`tab ${activeTab === 'pos' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('pos')}>POS</button>
+        <button className={`tab ${activeTab === 'inventory' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('inventory')}>Inventario</button>
+        <button className={`tab ${activeTab === 'warehouse' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('warehouse')}>Almacén</button>
+      </div>
+
+      {activeTab === 'pos' ? (
+        <PosPanel products={products} form={posForm} onChange={handlePosChange} onSubmit={handlePosSubmit} />
+      ) : activeTab === 'inventory' ? (
+        <InventoryTable products={products} />
+      ) : (
+        <ShelfManager
+          shelves={shelves}
+          products={products}
+          selectedShelfId={shelfForm.selectedShelfId}
+          onCreateShelf={handleCreateShelf}
+          onCreateProduct={(event) => {
+            event.preventDefault();
+            if (!shelfForm.productName || !shelfForm.productSku) return;
+            const nextProduct = {
+              id: Date.now(),
+              sku: shelfForm.productSku,
+              name: shelfForm.productName,
+              category: 'General',
+              stock: Number(shelfForm.productStock),
+              price: Number(shelfForm.productPrice),
+              minStock: Number(shelfForm.productMinStock),
+              shelfId: shelfForm.selectedShelfId,
+            };
+            setProducts((prev) => [nextProduct, ...prev]);
+            setShelfForm((prev) => ({ ...prev, productName: '', productSku: '', productStock: 0, productPrice: 0, productMinStock: 0 }));
+            setPosForm((prev) => ({ ...prev, productId: String(nextProduct.id) }));
+          }}
+          onDeleteShelf={handleDeleteShelf}
+          onDeleteProduct={handleDeleteProduct}
+          onAssignProduct={handleAssignProduct}
+          form={shelfForm}
+          setForm={setShelfForm}
+        />
+      )}
+    </section>
+  );
 
   return (
     <div className="app-shell">
@@ -129,36 +203,34 @@ function App() {
       </section>
 
       <div className="layout">
-        <section className="card">
-          <div className="tabs" aria-label="Selector de vistas">
-            <button
-              className={`tab ${activeTab === 'inventory' ? 'active' : ''}`}
-              onClick={() => setActiveTab('inventory')}
-              type="button"
-            >
-              Inventario
-            </button>
-            <button
-              className={`tab ${activeTab === 'movements' ? 'active' : ''}`}
-              onClick={() => setActiveTab('movements')}
-              type="button"
-            >
-              Movimientos
-            </button>
-          </div>
-
-          {activeTab === 'inventory' ? <InventoryTable products={products} /> : <MovementList products={products} movements={movements} />}
-        </section>
+        {inventoryTab}
 
         <aside className="card sidebar-panel">
-          <ProductForm form={productForm} onChange={handleProductChange} onSubmit={handleCreateProduct} />
+          <div className="panel-header compact">
+            <h3>Resumen</h3>
+            <span className="status-pill subtle">Live</span>
+          </div>
+          <div className="summary-stack">
+            <div className="summary-item">
+              <span>Estantes</span>
+              <strong>{shelves.length}</strong>
+            </div>
+            <div className="summary-item">
+              <span>Productos críticos</span>
+              <strong>{metrics.lowStockItems}</strong>
+            </div>
+            <div className="summary-item">
+              <span>Último movimiento</span>
+              <strong>{movements[0]?.type ?? 'Sin registro'}</strong>
+            </div>
+          </div>
+
           <div className="divider" />
-          <MovementForm
-            products={products}
-            form={movementForm}
-            onChange={handleMovementChange}
-            onSubmit={handleAddMovement}
-          />
+
+          <div className="timeline-panel">
+            <h3>Historial</h3>
+            <MovementList products={products} movements={movements.slice(0, 5)} />
+          </div>
         </aside>
       </div>
     </div>

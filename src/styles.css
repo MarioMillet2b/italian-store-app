@@ -290,6 +290,10 @@ button:hover {
   gap: 12px;
 }
 
+.compact-form {
+  margin-top: 6px;
+}
+
 h2, h3 {
   margin-top: 0;
 }
