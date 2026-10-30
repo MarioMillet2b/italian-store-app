@@ -30,13 +30,60 @@ jobs:
       - name: Install SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Tests, lint and debug APK
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --no-daemon
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: floro-milano-debug-${{ github.sha }}
           path: |
             app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             app/build/reports/tests/testDebugUnitTest/
             app/build/reports/lint-results-debug.html
           if-no-files-found: error
+          retention-days: 14
+
+  experience:
+    name: Android user flows (API ${{ matrix.api }})
+    needs: android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 29
+            tag: default
+          - api: 35
+            tag: google_apis
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          cmdline-tools-version: '13114758'
+          packages: 'platform-tools emulator system-images;android-${{ matrix.api }};${{ matrix.tag }};x86_64'
+          log-accepted-android-sdk-licenses: 'false'
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: floro-milano-debug-${{ github.sha }}
+          path: ${{ runner.temp }}/floro-apks
+      - name: Run native UI flows on isolated emulator
+        env:
+          FLORO_UI_APK_DIR: ${{ runner.temp }}/floro-apks
+          FLORO_UI_API: ${{ matrix.api }}
+          FLORO_UI_TAG: ${{ matrix.tag }}
+        run: |
+          sudo chmod a+rw /dev/kvm
+          bash scripts/android-ui-check.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: floro-ux-screenshots-api${{ matrix.api }}-${{ github.sha }}
+          path: app/build/reports/ui
+          if-no-files-found: warn
           retention-days: 14

@@ -96,7 +96,7 @@ object Labels {
                     putExtra(Intent.EXTRA_STREAM, uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 },
-                "Condividi etichetta",
+                context.getString(R.string.share_png),
             )
         )
     }
@@ -115,7 +115,7 @@ object Labels {
                 .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                 .build()
         (context.getSystemService(Context.PRINT_SERVICE) as PrintManager).print(
-            "Floro Milano · etichetta",
+            context.getString(R.string.app_name) + " · " + context.getString(R.string.label),
             object : PrintDocumentAdapter() {
                 private var layout = attributes
 
@@ -175,7 +175,7 @@ object Labels {
                         }
                         callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
                     } catch (_: Exception) {
-                        callback.onWriteFailed("Impossibile creare il documento di stampa.")
+                        callback.onWriteFailed(context.getString(R.string.print_failed))
                     }
                 }
             },

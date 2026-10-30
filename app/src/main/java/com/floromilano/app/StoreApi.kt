@@ -8,12 +8,13 @@ import org.json.JSONObject
 
 class ApiFailure(val status: Int, message: String) : Exception(message)
 
-class StoreApi(private val base: String, private val token: String) {
-    suspend fun request(
-        path: String,
-        method: String = "GET",
-        payload: JSONObject? = null,
-    ): JSONObject =
+class StoreApi(
+    private val base: String,
+    private val token: String,
+    private val language: String = "it",
+    private val errorLabel: (Int) -> String = { "HTTP $it" },
+) : StoreGateway {
+    override suspend fun request(path: String, method: String, payload: JSONObject?): JSONObject =
         withContext(Dispatchers.IO) {
             require(path.startsWith("/") && !path.startsWith("//"))
             val connection =
@@ -25,7 +26,7 @@ class StoreApi(private val base: String, private val token: String) {
                 connection.connectTimeout = 10000
                 connection.readTimeout = 15000
                 connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("Accept-Language", "it")
+                connection.setRequestProperty("Accept-Language", language)
                 connection.setRequestProperty("Authorization", "Bearer $token")
                 if (payload != null) {
                     connection.doOutput = true
@@ -52,8 +53,7 @@ class StoreApi(private val base: String, private val token: String) {
                         }
                     throw ApiFailure(
                         status,
-                        first
-                            ?: json.optString("message").ifBlank { "Risposta del server: $status" },
+                        first ?: json.optString("message").ifBlank { errorLabel(status) },
                     )
                 }
                 json

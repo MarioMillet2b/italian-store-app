@@ -16,3 +16,10 @@ No afirmar compatibilidad de impresora sin pruebas con el modelo exacto.
 Las ventas son registros internos: no adición de cobros ni recibos fiscales.
 No guardar keystores, local.properties, tokens o APK en el historial de Git.
 
+
+Para cambios de interfaz, leer docs/UX_E_IDIOMAS.md. Todos los textos de interfaz
+van en strings.xml y values-es/strings.xml. Las categorías y traducciones de datos
+vienen del servidor; nunca traducir IDs o alterar precios/cantidades al cambiar idioma.
+Usar el catálogo agrupado por producto, sin reconstruir grupos a partir de una
+página parcial de variantes. Las pruebas UI solo ejecutan un gateway sintético en
+emuladores; gatewayOverride no debe activarse mediante ajustes ni intents del APK.

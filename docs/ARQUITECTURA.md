@@ -11,7 +11,8 @@ Java 17 o superior para compilar. Runtime de Android, sin servidor propio.
 - SecureVault: AES-GCM con clave no exportable en Android Keystore; preferencias
   privadas cifradas; backups Android deshabilitados.
 - StoreUrl: solo origen HTTPS sin rutas, query ni credenciales.
-- MainActivity: Compose, italiano, venta/inventario/magazzino/impostazioni.
+- MainActivity: coordina Compose; pantallas separadas y recursos en español/italiano.
+  Ver UX_E_IDIOMAS.md para navegación y pruebas visuales.
 - Labels: Code128 con ZXing, PNG compartido mediante proveedor privado y permisos
   temporales; Android Print Framework para impresión/PDF.
 - MoneyInput: validación decimal exacta en céntimos.

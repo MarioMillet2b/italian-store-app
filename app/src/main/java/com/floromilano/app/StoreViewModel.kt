@@ -29,6 +29,8 @@ data class Variant(
     val lowStock: Int,
     val locations: List<Pair<Int, Int>>,
     val status: String,
+    val imageUrl: String? = null,
+    val categoryId: Int? = null,
 )
 
 data class NamedItem(
@@ -59,12 +61,25 @@ data class UiState(
     val metrics: JSONObject = JSONObject(),
     val history: JSONObject = JSONObject(),
     val currency: String = "EUR",
+    val products: List<CatalogProduct> = emptyList(),
+    val categories: List<CatalogCategory> = emptyList(),
+    val categoryId: Int? = null,
+    val inStockOnly: Boolean = false,
+    val lowStockOnly: Boolean = false,
+    val catalogMode: String = "sale",
+    val sort: String = "name",
+    val catalogLoading: Boolean = false,
+    val totalProducts: Int = 0,
 )
 
 class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private val vault = (application as StoreApplication).vault
     private var vaultFailed = false
     private var sessionVersion = 0
+    private var catalogVersion = 0
+
+    private fun tr(id: Int, vararg args: Any) = AppLanguage.text(getApplication(), id, *args)
+
     private var foreground = false
     private var saved =
         try {
@@ -79,15 +94,20 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                 url = saved.optString("url"),
                 configured = saved.optString("token").isNotBlank(),
                 pending = saved.has("pending"),
-                message =
-                    if (vaultFailed)
-                        "Archivio locale non leggibile. Verifica sul server eventuali vendite prima di ripristinare i dati dell’app."
-                    else "",
+                message = if (vaultFailed) tr(R.string.vault_unreadable) else "",
             )
         )
         private set
 
-    private fun api() = StoreApi(saved.getString("url"), saved.getString("token"))
+    private fun api(): StoreGateway =
+        getApplication<StoreApplication>().gatewayOverride
+            ?: StoreApi(
+                saved.getString("url"),
+                saved.getString("token"),
+                AppLanguage.locale(getApplication()).language,
+            ) {
+                tr(R.string.api_error, it)
+            }
 
     private val connectivity = application.getSystemService(ConnectivityManager::class.java)
     private val networkCallback =
@@ -132,15 +152,24 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val normalized = StoreUrl.normalize(url)
                 require(!state.pending || normalized == saved.optString("url")) {
-                    "Risolvi prima la richiesta in sospeso per cambiare negozio."
+                    tr(R.string.pending_store_change)
                 }
                 val credential =
                     token.trim().ifBlank {
                         if (normalized == saved.optString("url")) saved.optString("token") else ""
                     }
-                require(credential.isNotBlank()) { "Inserisci la chiave del dispositivo." }
-                val context = StoreApi(normalized, credential).request("/context")
-                require(context.optInt("api_version") == 1) { "Versione API non compatibile." }
+                require(credential.isNotBlank()) { tr(R.string.key_required) }
+                val candidate =
+                    getApplication<StoreApplication>().gatewayOverride
+                        ?: StoreApi(
+                            normalized,
+                            credential,
+                            AppLanguage.locale(getApplication()).language,
+                        ) {
+                            tr(R.string.api_error, it)
+                        }
+                val context = candidate.request("/context")
+                require(context.optInt("api_version") == 1) { tr(R.string.incompatible_api) }
                 val replacement = JSONObject().put("url", normalized).put("token", credential)
                 if (saved.has("pending")) replacement.put("pending", saved.getJSONObject("pending"))
                 vault.write(replacement)
@@ -153,12 +182,17 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                         online = true,
                         busy = true,
                         pending = saved.has("pending"),
-                        message = "Negozio collegato.",
+                        message = tr(R.string.store_connected),
                     )
                 applyContext(context)
                 loadVariants()
             } catch (e: Exception) {
-                state = state.copy(message = e.message ?: "Connessione non riuscita.")
+                state =
+                    state.copy(
+                        message =
+                            if (e is ApiFailure) e.message ?: tr(R.string.connection_failed)
+                            else tr(R.string.invalid_connection)
+                    )
             } finally {
                 state = state.copy(busy = false)
             }
@@ -186,6 +220,21 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                 methods = named(json.getJSONArray("payment_methods")),
                 metrics = json.getJSONObject("metrics"),
                 currency = json.getString("currency"),
+                categories =
+                    json.optJSONArray("categories")?.let { values ->
+                        (0 until values.length()).map { index ->
+                            values.getJSONObject(index).let { item ->
+                                CatalogCategory(
+                                    item.getInt("id"),
+                                    item.getString("name"),
+                                    if (item.isNull("parent_id")) null
+                                    else item.getInt("parent_id"),
+                                    item.optInt("product_count", 1),
+                                    item.optInt("sale_product_count", 1),
+                                )
+                            }
+                        }
+                    } ?: emptyList(),
             )
     }
 
@@ -195,55 +244,77 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         if (version == sessionVersion) applyContext(response)
     }
 
-    private suspend fun loadVariants() {
+    private suspend fun loadVariants(requestVersion: Int = ++catalogVersion) {
         val version = sessionVersion
         val query = URLEncoder.encode(state.query, "UTF-8")
-        val response = api().request("/variants?q=$query&page=${state.page}")
-        if (version != sessionVersion) return
-        val array = response.getJSONArray("data")
-        val variants =
-            (0 until array.length()).map {
-                val v = array.getJSONObject(it)
-                val attrs = v.getJSONObject("attributes")
-                val balances = v.getJSONArray("locations")
-                Variant(
-                    v.getInt("id"),
-                    v.getInt("product_id"),
-                    v.getString("name"),
-                    v.getString("sku"),
-                    v.getString("barcode"),
-                    attrs.keys().asSequence().joinToString(" · ") { k ->
-                        "$k: ${attrs.getString(k)}"
-                    },
-                    v.getLong("unit_price_cents"),
-                    v.getInt("stock"),
-                    v.getInt("available"),
-                    v.getInt("unassigned"),
-                    v.getInt("low_stock_threshold"),
-                    (0 until balances.length()).map { b ->
-                        balances.getJSONObject(b).let { x ->
-                            x.getInt("inventory_location_id") to x.getInt("quantity")
-                        }
-                    },
-                    v.getString("status"),
+        val category =
+            state.categoryId?.let { if (it == -1) "&uncategorized=1" else "&category_id=$it" } ?: ""
+        val page = state.page
+        val response =
+            api()
+                .request(
+                    "/catalog?q=$query&page=$page$category&mode=${state.catalogMode}&sort=${state.sort}&in_stock=${if(state.inStockOnly) 1 else 0}&low_stock=${if(state.lowStockOnly) 1 else 0}"
                 )
-            }
+        if (version != sessionVersion || requestVersion != catalogVersion) return
+        val incoming = CatalogParser.products(response)
+        val products = if (page == 1) incoming else (state.products + incoming).distinctBy { it.id }
         state =
-            state.copy(variants = variants, lastPage = response.getInt("last_page"), online = true)
+            state.copy(
+                products = products,
+                variants = products.flatMap { it.variants },
+                lastPage = response.getInt("last_page"),
+                totalProducts = response.getInt("total"),
+                online = true,
+            )
     }
 
     fun search(query: String, page: Int = 1) {
+        browse(query = query, page = page)
+    }
+
+    fun browse(
+        query: String = state.query,
+        categoryId: Int? = state.categoryId,
+        inStock: Boolean = state.inStockOnly,
+        lowStock: Boolean = state.lowStockOnly,
+        sort: String = state.sort,
+        mode: String = state.catalogMode,
+        page: Int = 1,
+    ) {
         if (state.busy || !state.configured) return
-        state = state.copy(query = query, page = page, busy = true)
+        val version = sessionVersion
+        val requestVersion = ++catalogVersion
+        state =
+            state.copy(
+                query = query.take(100),
+                categoryId = categoryId,
+                inStockOnly = inStock,
+                lowStockOnly = lowStock,
+                sort = sort,
+                catalogMode = mode,
+                page = page,
+                catalogLoading = true,
+            )
         viewModelScope.launch {
             try {
-                loadVariants()
+                loadVariants(requestVersion)
             } catch (e: Exception) {
-                connectionFailure(e)
+                if (version == sessionVersion && requestVersion == catalogVersion)
+                    if (e is ApiFailure && e.status == 422)
+                        state = state.copy(message = e.message.orEmpty())
+                    else connectionFailure(e)
             } finally {
-                state = state.copy(busy = false)
+                if (version == sessionVersion && requestVersion == catalogVersion)
+                    state = state.copy(catalogLoading = false)
             }
         }
+    }
+
+    fun languageChanged() {
+        sessionVersion++
+        catalogVersion++
+        state = state.copy(message = "", page = 1, catalogLoading = false)
+        refresh()
     }
 
     fun refresh() {
@@ -257,7 +328,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 connectionFailure(e)
             } finally {
-                state = state.copy(busy = false)
+                state = state.copy(busy = false, catalogLoading = false)
             }
         }
     }
@@ -267,29 +338,43 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             state.copy(
                 online = false,
                 message =
-                    if (e is ApiFailure && e.status in listOf(401, 403))
-                        "Accesso scaduto o revocato. Controlla la chiave nelle impostazioni."
-                    else "Server non raggiungibile. Controlla la connessione.",
+                    if (e is ApiFailure && e.status in listOf(401, 403)) tr(R.string.access_expired)
+                    else tr(R.string.no_connection),
             )
     }
 
-    fun add(variant: Variant, locationId: Int?) {
+    fun add(variant: Variant, locationId: Int?, quantity: Int = 1) {
         if (!state.online || state.busy || state.pending) return
         val line = state.cart.find { it.variant.id == variant.id && it.locationId == locationId }
-        val count = state.cart.filter { it.variant.id == variant.id }.sumOf { it.quantity }
-        if (count >= variant.available) {
-            state = state.copy(message = "Quantità disponibile esaurita.")
+        if (
+            quantity < 1 || quantity > CartAvailability.remaining(variant, state.cart, locationId)
+        ) {
+            state = state.copy(message = tr(R.string.stock_exhausted))
             return
         }
         state =
             state.copy(
                 cart =
-                    if (line == null) state.cart + CartLine(variant, 1, locationId)
+                    if (line == null) state.cart + CartLine(variant, quantity, locationId)
                     else
                         state.cart.map {
-                            if (it === line) it.copy(quantity = it.quantity + 1) else it
+                            if (it === line) it.copy(quantity = it.quantity + quantity) else it
                         }
             )
+    }
+
+    fun reduce(index: Int) {
+        if (state.busy || state.pending) return
+        val line = state.cart.getOrNull(index) ?: return
+        if (line.quantity == 1) remove(index)
+        else
+            state =
+                state.copy(
+                    cart =
+                        state.cart.mapIndexed { i, item ->
+                            if (i == index) item.copy(quantity = item.quantity - 1) else item
+                        }
+                )
     }
 
     fun remove(index: Int) {
@@ -323,10 +408,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             state = state.copy(pending = true)
             retryPending()
         } catch (_: Exception) {
-            state =
-                state.copy(
-                    message = "Impossibile salvare la richiesta. Nessuna operazione inviata."
-                )
+            state = state.copy(message = tr(R.string.save_request_failed))
         }
     }
 
@@ -369,8 +451,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                             if (pending.getString("path") == "/sales") emptyList() else state.cart,
                         message =
                             if (response.has("sale_id"))
-                                "Operazione registrata · vendita #${response.getInt("sale_id")}"
-                            else "Movimento registrato.",
+                                tr(R.string.sale_saved, response.getInt("sale_id"))
+                            else tr(R.string.operation_saved),
                     )
             } catch (e: ApiFailure) {
                 // Authentication/rate-limit failures say nothing about an
@@ -378,21 +460,14 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                 if (e.status == 422) {
                     clearPending()
                     state =
-                        state.copy(pending = false, message = e.message ?: "Operazione rifiutata.")
-                } else
-                    state =
                         state.copy(
-                            message =
-                                "Esito da verificare. Riprova la stessa richiesta: non verrà duplicata."
+                            pending = false,
+                            message = e.message ?: tr(R.string.operation_rejected),
                         )
+                } else state = state.copy(message = tr(R.string.pending_retry))
                 if (e.status == 401 || e.status == 403) state = state.copy(online = false)
             } catch (_: Exception) {
-                state =
-                    state.copy(
-                        online = false,
-                        message =
-                            "Esito non confermato. Quando torni online, riprova la stessa richiesta.",
-                    )
+                state = state.copy(online = false, message = tr(R.string.pending_offline))
             }
             try {
                 if (state.online) {
@@ -412,11 +487,12 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 api().request(path, if (update) "PATCH" else "POST", payload)
-                state = state.copy(message = "Salvato.")
+                state = state.copy(message = tr(R.string.saved))
                 loadContext()
                 loadVariants()
             } catch (e: ApiFailure) {
-                state = state.copy(message = e.message ?: "Salvataggio non riuscito.")
+                if (e.status == 401 || e.status == 403) connectionFailure(e)
+                else state = state.copy(message = e.message ?: tr(R.string.save_failed))
             } catch (e: Exception) {
                 connectionFailure(e)
             } finally {

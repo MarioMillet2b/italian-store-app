@@ -39,3 +39,9 @@ Compatibilidad directa con T50m Pro/Katasymbol y Brother pendiente de prueba.
 Nunca enviar la clave por chat ni adjuntarla a capturas. TLS se verifica siempre;
 los redirects no reciben Authorization. Hay protección persistente frente a
 reintentos de ventas y movimientos. Ver arquitectura antes de modificarla.
+
+## Catálogo visual y español / italiano (0.2.0)
+Tarjetas agrupadas por producto, fotos, categorías, búsqueda al escribir, filtros,
+selección de talla/color y carrito accesible al pie. Idioma seleccionable en Ajustes.
+Ver [UX e idiomas](docs/UX_E_IDIOMAS.md) para arquitectura y pruebas de emulador.
+Esta versión requiere el endpoint de catálogo del backend actualizado en staing.
