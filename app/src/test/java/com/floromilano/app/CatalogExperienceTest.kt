@@ -57,9 +57,29 @@ class CatalogExperienceTest {
                     .newDocumentBuilder()
                     .parse(file)
                     .getElementsByTagName("string")
-            return (0 until nodes.length).associate { i ->
-                nodes.item(i).attributes.getNamedItem("name").nodeValue to nodes.item(i).textContent
+            val messages =
+                (0 until nodes.length)
+                    .associate { i ->
+                        nodes.item(i).attributes.getNamedItem("name").nodeValue to
+                            nodes.item(i).textContent
+                    }
+                    .toMutableMap()
+            val plurals =
+                DocumentBuilderFactory.newInstance()
+                    .newDocumentBuilder()
+                    .parse(file)
+                    .getElementsByTagName("plurals")
+            for (i in 0 until plurals.length) {
+                val plural = plurals.item(i)
+                val name = plural.attributes.getNamedItem("name").nodeValue
+                for (j in 0 until plural.childNodes.length) {
+                    val item = plural.childNodes.item(j)
+                    if (item.nodeName == "item")
+                        messages["$name.${item.attributes.getNamedItem("quantity").nodeValue}"] =
+                            item.textContent
+                }
             }
+            return messages
         }
         val it = strings("values")
         val es = strings("values-es")

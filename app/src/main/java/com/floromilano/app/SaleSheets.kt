@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,6 +74,9 @@ internal fun ProductSheet(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+                IconButton(onClick = close) {
+                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
+                }
             }
             Spacer(Modifier.height(12.dp))
             LazyColumn(
@@ -116,7 +120,12 @@ internal fun ProductSheet(
                                 Text(
                                     if (inventory) "${variant.sku} · ${variant.stock}"
                                     else if (available == 0) stringResource(R.string.sold_out)
-                                    else stringResource(R.string.available_count, available),
+                                    else
+                                        pluralStringResource(
+                                            R.plurals.available_count,
+                                            available,
+                                            available,
+                                        ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -239,11 +248,18 @@ internal fun CartSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.cart), style = MaterialTheme.typography.titleLarge)
+                Text(
+                    stringResource(R.string.cart),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                )
                 Text(
                     stringResource(R.string.cart_items, s.cart.sumOf { it.quantity }),
                     style = MaterialTheme.typography.labelLarge,
                 )
+                IconButton(onClick = close) {
+                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
+                }
             }
             Spacer(Modifier.height(12.dp))
             LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 350.dp)) {

@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -142,7 +143,7 @@ internal fun CatalogScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                stringResource(R.string.products_count, s.totalProducts),
+                pluralStringResource(R.plurals.products_count, s.totalProducts, s.totalProducts),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -210,9 +211,7 @@ internal fun CatalogScreen(
                 }
             ) {
                 Icon(
-                    painterResource(
-                        if (listView) R.drawable.ic_inventory else R.drawable.ic_warehouse
-                    ),
+                    painterResource(if (listView) R.drawable.ic_inventory else R.drawable.ic_list),
                     stringResource(if (listView) R.string.grid_view else R.string.list_view),
                 )
             }
@@ -347,9 +346,17 @@ private fun ProductCard(
                     )
                     Text(money(product.minimumPrice, currency), fontWeight = FontWeight.SemiBold)
                     Text(
-                        stringResource(R.string.variant_count, product.variants.size) +
+                        pluralStringResource(
+                            R.plurals.variant_count,
+                            product.variants.size,
+                            product.variants.size,
+                        ) +
                             " · " +
-                            stringResource(R.string.available_count, product.available),
+                            pluralStringResource(
+                                R.plurals.available_count,
+                                product.available,
+                                product.available,
+                            ),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -385,9 +392,17 @@ private fun ProductCard(
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        stringResource(R.string.variant_count, product.variants.size) +
+                        pluralStringResource(
+                            R.plurals.variant_count,
+                            product.variants.size,
+                            product.variants.size,
+                        ) +
                             " · " +
-                            stringResource(R.string.available_count, product.available),
+                            pluralStringResource(
+                                R.plurals.available_count,
+                                product.available,
+                                product.available,
+                            ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.labelSmall,

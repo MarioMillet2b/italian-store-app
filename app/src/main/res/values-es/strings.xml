@@ -31,9 +31,9 @@
   <string name="choose_variant">Elige la variante</string>
   <string name="quantity">Cantidad</string>
   <string name="sold_out">Agotado</string>
-  <string name="available_count">%1$d disponibles</string>
+  <plurals name="available_count"><item quantity="one">%1$d disponible</item><item quantity="other">%1$d disponibles</item></plurals>
   <string name="physical_stock">%1$d unidades totales</string>
-  <string name="variant_count">%1$d variantes</string>
+  <plurals name="variant_count"><item quantity="one">%1$d variante</item><item quantity="other">%1$d variantes</item></plurals>
   <string name="price_from">Desde %1$s</string>
   <string name="low_stock">Stock bajo</string>
   <string name="archived">Archivado</string>
@@ -159,7 +159,7 @@ Se comprobarán el precio y las existencias antes de registrarla.</string>
   <string name="save_failed">No se pudo guardar.</string>
   <string name="api_error">La tienda respondió: %1$d</string>
   <string name="cart_items">%1$d artículos</string>
-  <string name="products_count">%1$d productos</string>
+  <plurals name="products_count"><item quantity="one">%1$d producto</item><item quantity="other">%1$d productos</item></plurals>
   <string name="variant_selected">Variante seleccionada</string>
   <string name="add_quantity">Añadir · %1$s</string>
   <string name="total">Total</string>
