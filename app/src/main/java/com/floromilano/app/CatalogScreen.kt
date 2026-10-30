@@ -147,6 +147,11 @@ internal fun CatalogScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
+            if (inventory) {
+                IconButton(onClick = onNew, enabled = canWrite) {
+                    Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.new_product))
+                }
+            }
             Box {
                 IconButton(onClick = { sortMenu = true }) {
                     Icon(painterResource(R.drawable.ic_sort), stringResource(R.string.sort))
