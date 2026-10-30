@@ -36,8 +36,8 @@ for attempt in $(seq 1 90); do
     sleep 2
 done
 [[ "$ready" == true ]] || { echo 'Emulator did not finish booting.' >&2; exit 1; }
-main_apk="$(rg --files "$apk_root" | rg '(^|/)app-debug\.apk$')"
-test_apk="$(rg --files "$apk_root" | rg '(^|/)app-debug-androidTest\.apk$')"
+main_apk="$(find "$apk_root" -type f -name app-debug.apk)"
+test_apk="$(find "$apk_root" -type f -name app-debug-androidTest.apk)"
 [[ -f "$main_apk" && -f "$test_apk" ]]
 # A CI APK may have another debug signature; no real shop data lives here.
 "$adb_bin" -s "$serial" uninstall com.floromilano.app.test >/dev/null 2>&1 || true
